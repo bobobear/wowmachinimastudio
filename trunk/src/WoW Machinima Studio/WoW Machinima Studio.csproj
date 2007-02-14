@@ -35,6 +35,7 @@
   <ItemGroup>
     <Compile Include="Game\GameObject.cs" />
     <Compile Include="Game\Unit.cs" />
+    <Compile Include="Helper.cs" />
     <Compile Include="Machinima\Machinima.cs" />
     <Compile Include="Network\Connector.cs" />
     <Compile Include="Network\Packet.cs" />
