@@ -1,0 +1,56 @@
+[P] = Pending
+[D] = Done
+[N] = Not started yet 
+
+Milestone 1 v0.1.0(Connector):
+[P] Client authentication (Realm Server)
+[N] Basic world server
+
+Milestone 2 v0.2.0(Listener):
+[N] Defining required CMSG opcodes
+[N] Unpacking client packets
+
+Milestone 3 v0.3.0(Commander):
+[N] Defining required SMSG opcodes
+[N] Packing/Sending server commands
+[N] Implementing client gm commands
+
+Milestone 4 v0.3.5(Co-operator):
+[N] Creating basic GUI (XML + LUA)
+
+Milestone 5 v0.4.0(Machinima definition)
+[N] Defining Unit/GameObject/Effect classes
+[N] Defining Action/Sequence/Machinima classes
+[N] Defining MachinimaStudio class
+[N] Machinima saving/loading
+
+Milestone 6 v0.5.5(Handler)
+[N] Freeform camera
+[N] Add/Remove Unit/Objects at specified position
+[N] Unit/Object properties (Size for now)
+[N] Unit/Object movements  (Pathing System)
+[N] Unit/Object animations (Emotes)
+
+Milestone 7 v0.6.5(Friendly)
+[N] Creating complete GUI
+[N] Connecting GUI to relative server commands
+
+Milestone 8 v0.7.5(First Beta!!!)
+[N] Unit properties (Visuals, Textures, Itemsets, ...)
+[N] Complete movement system(Walk, run, fly, swim, ...)
+[N] Camera movements (Shake?)
+[N] Visual effects (Death effect, spells, ...)
+[N] Timeline definition
+
+Milestone 9 v0.9.0(Abstract Implementions)
+[N] Units implemention
+[N] Objects implemention
+[N] Spells implemention
+[N] Mountable units implemention
+[N] Other implementions
+
+Milestone 10 v1.0.0(First Release!!!)
+[N] Code optimization
+[N] Memory optimization
+[N] Final testing/debugging
+[N] Release!!! :)
