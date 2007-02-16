@@ -37,7 +37,10 @@
     <Compile Include="Game\Unit.cs" />
     <Compile Include="Helper.cs" />
     <Compile Include="Machinima\Machinima.cs" />
-    <Compile Include="Network\Connector.cs" />
+    <Compile Include="Math\BigInteger.cs" />
+    <Compile Include="Math\UInteger.cs" />
+    <Compile Include="Network\RealmServer.cs" />
+    <Compile Include="Network\WorldServer.cs" />
     <Compile Include="Network\Packet.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

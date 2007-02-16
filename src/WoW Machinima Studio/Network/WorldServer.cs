@@ -8,7 +8,7 @@ using System.IO;
 
 namespace WoW_Machinima_Studio.Network
 {
-	public class Connector
+	public class WorldServer
 	{
 		//TODO Connector class implemention
 		private bool _is_accepting;
@@ -48,7 +48,7 @@ namespace WoW_Machinima_Studio.Network
 		public event Action<Packet> OnReceive;
 		public event Action<IPAddress> OnAccept;
 
-		public Connector()
+		public WorldServer()
 		{
 			_listener = new TcpListener(IPAddress.Parse("127.0.0.1"),3724);
 		}
