@@ -10,8 +10,10 @@ namespace WoW_Machinima_Studio
 		static void Main(string[] args)
 		{
 			Console.WriteLine("Thanks to vWoW team.");
-			WorldServer wowconnector = new WorldServer();
-			wowconnector.Start();
+			RealmServer rs = new RealmServer();
+			rs.Start();
+			//WorldServer wowconnector = new WorldServer();
+			//wowconnector.Start();
 			Console.ReadKey(false);
 		}
 	}
