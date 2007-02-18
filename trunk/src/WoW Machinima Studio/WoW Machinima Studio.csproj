@@ -38,7 +38,6 @@
     <Compile Include="Helper.cs" />
     <Compile Include="Machinima\Machinima.cs" />
     <Compile Include="Math\BigInteger.cs" />
-    <Compile Include="Math\UInteger.cs" />
     <Compile Include="Network\RealmServer.cs" />
     <Compile Include="Network\WorldServer.cs" />
     <Compile Include="Network\Packet.cs" />
