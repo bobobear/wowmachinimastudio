@@ -6,10 +6,11 @@ using System.Net;
 using System.IO;
 using System.Security.Cryptography;
 using System.Threading;
+//using WoW_Machinima_Studio.Network;
 
 namespace WoW_Machinima_Studio.Network
 {
-	internal struct async_packet
+	/*internal struct async_packet
 	{
 		public bool isHeader;
 		public Stream stream;
@@ -20,7 +21,7 @@ namespace WoW_Machinima_Studio.Network
 			this.stream = stream;
 			this.isHeader = isHeader;
 		}
-	}
+	}*/
 	enum RealmOpcode
 	{
 		RS_AUTH_LOGON_CHALLENGE = 0x00,
@@ -40,7 +41,12 @@ namespace WoW_Machinima_Studio.Network
 		RD_AUTH_HASH,
 		RD_AUTH_SALT,
 		RD_AUTH_N,
-		RD_AUTH_ERROR
+		RD_AUTH_ERROR,
+		RD_SRP6_A,
+		RD_SRP6_M1,
+		RD_SRP6_M2,
+		RD_SRP6_CRC,
+		RD_SRP6_KEYNUM
 	}
 	class RealmPacket
 	{
@@ -61,18 +67,13 @@ namespace WoW_Machinima_Studio.Network
 		{
 			Data = new Dictionary<RealmData, object>();
 		}
-		public static RealmPacket FromStream(TcpClient client)
+		public static RealmPacket FromStream(Stream stream)
 		{
-			while (client.Available < 3)
-				Thread.Sleep(10);
-			Stream stream = client.GetStream();
 			RealmPacket p = new RealmPacket();
 			BinaryReader reader = new BinaryReader(stream);
 			p.opcode = (RealmOpcode)(reader.ReadByte());
 			reader.ReadByte();
 			int packetSize = reader.ReadUInt16();
-			while (client.Available < packetSize)
-				Thread.Sleep(10);
 			switch (p.opcode)
 			{
 				case RealmOpcode.RS_AUTH_RECON_CHALLENGE:
@@ -84,10 +85,21 @@ namespace WoW_Machinima_Studio.Network
 					p.Data.Add(RealmData.RD_CLIENT_IP, new IPAddress(reader.ReadBytes(4)));
 					p.Data.Add(RealmData.RD_ACCOUNT_NAME, reader.ReadString());
 					break;
+				case RealmOpcode.RS_AUTH_RECON_PROOF:
+				case RealmOpcode.RS_AUTH_LOGON_PROOF:
+					p.Data.Add(RealmData.RD_SRP6_A, reader.ReadBytes(32));
+					p.Data.Add(RealmData.RD_SRP6_M1, reader.ReadBytes(20));
+					p.Data.Add(RealmData.RD_SRP6_CRC, reader.ReadBytes(20));
+					p.Data.Add(RealmData.RD_SRP6_KEYNUM, reader.ReadByte());
+					break;
 				default:
 					throw new InvalidDataException();
 			}
 			return p;
+		}
+		public static RealmPacket FromByteArray(byte[] array)
+		{
+			return RealmPacket.FromStream(new MemoryStream(array));
 		}
 		public static RealmPacket CreateAuthResponse(String name, String password)
 		{
@@ -111,90 +123,47 @@ namespace WoW_Machinima_Studio.Network
 			BigInteger K = new BigInteger(new Byte[] { 3 });
 			BigInteger temp = ((K * int_d) + int_c.modPow(new BigInteger(reverse(rand)), new BigInteger(reverse(N)))) % new BigInteger(reverse(N));
 
-			RealmPacket packet = new RealmPacket();
-			packet.opcode = RealmOpcode.RS_AUTH_LOGON_CHALLENGE;
-			packet.Data.Add(RealmData.RD_AUTH_ERROR, 0);
-			packet.Data.Add(RealmData.RD_AUTH_HASH, reverse(temp.getBytes()));
-			packet.Data.Add(RealmData.RD_AUTH_SALT, salt);
-			packet.Data.Add(RealmData.RD_AUTH_N, N);
-			return packet;
+			RealmPacket response = new RealmPacket();
+			response.opcode = RealmOpcode.RS_AUTH_LOGON_CHALLENGE;
+			response.Data.Add(RealmData.RD_AUTH_ERROR, 0);
+			response.Data.Add(RealmData.RD_AUTH_HASH, temp.getBytes());
+			response.Data.Add(RealmData.RD_AUTH_SALT, salt);
+			response.Data.Add(RealmData.RD_AUTH_N, N);
+			return response;
 		}
 		public byte[] ToByteArray()
 		{
 			byte[] buffer = new byte[0];
+			BinaryWriter writer;
 			switch (this.opcode)
 			{
 				case RealmOpcode.RS_AUTH_RECON_CHALLENGE:
 				case RealmOpcode.RS_AUTH_LOGON_CHALLENGE:
-					buffer = new byte[118];
-					BinaryWriter writer = new BinaryWriter(new MemoryStream(buffer));
+					buffer = new byte[119];
+					writer = new BinaryWriter(new MemoryStream(buffer));
+					writer.Write((byte)RealmOpcode.RS_AUTH_LOGON_CHALLENGE);
 					writer.Write((byte)0);
 					writer.Write((byte)0);
-					writer.Write((byte)32);
 					writer.Write(reverse((byte[])Data[RealmData.RD_AUTH_HASH]));
 					writer.Write((byte)1);
 					writer.Write((byte)7);
 					writer.Write((byte)32);
 					writer.Write((byte[])Data[RealmData.RD_AUTH_N]);
 					writer.Write((byte[])Data[RealmData.RD_AUTH_SALT]);
+					writer.Write((byte)0);
+					break;
+				case RealmOpcode.RS_AUTH_RECON_PROOF:
+				case RealmOpcode.RS_AUTH_LOGON_PROOF:
+					buffer = new byte[26];
+					writer = new BinaryWriter(new MemoryStream(buffer));
+					writer.Write((byte)RealmOpcode.RS_AUTH_LOGON_PROOF);
+					writer.Write((byte)0);
+					writer.Write((byte[])Data[RealmData.RD_SRP6_M2]);
+					writer.Write((uint)0);
 					break;
 			}
 			return buffer;
 		}
-		//private void _readstream_callback(IAsyncResult ar)
-		//{
-		//    async_packet p = (async_packet)Convert.ChangeType(ar.AsyncState, typeof(async_packet));
-		//    int n = 0;
-		//    while (n != p.buffer.Length)
-		//            n += p.stream.EndRead(ar);
-		//    BinaryReader reader = new BinaryReader(new MemoryStream(p.buffer));
-		//    if (p.isHeader)
-		//    {
-		//        opcode = (RealmOpcode)(reader.ReadByte());
-		//        reader.ReadByte();
-		//        int size = (int)reader.ReadUInt16();
-		//        async_packet p2 = new async_packet(p.stream,size,false);
-		//        p2.stream.BeginRead(p2.buffer, 0, p2.buffer.Length, new AsyncCallback(_readstream_callback), p2);
-		//    }
-		//    else
-		//    {
-		//        switch (opcode)
-		//        {
-		//            case RealmOpcode.RS_AUTH_RECON_CHALLENGE:
-		//            case RealmOpcode.RS_AUTH_LOGON_CHALLENGE:
-
-		//                //	Client Name ("WoW\0"):
-		//                reader.ReadBytes(4);
-
-		//                //	Client version:
-		//                Data.Add(RealmData.RD_CLIENT_VERSION, reader.ReadByte() + "." + reader.ReadByte() + "." + reader.ReadByte());
-
-		//                //	Client Build:
-		//                Data.Add(RealmData.RD_CLIENT_BUILD, reader.ReadUInt16());
-
-		//                //	Client Platform:
-		//                reader.ReadBytes(4);
-
-		//                //	Client OS:
-		//                reader.ReadBytes(4);
-
-		//                //	Client Area:
-		//                reader.ReadBytes(4);
-
-		//                //	Client Timezone:
-		//                reader.ReadUInt32();
-
-		//                //	Client IP:
-		//                Data.Add(RealmData.RD_CLIENT_IP, new IPAddress(reader.ReadBytes(4)));
-
-		//                //	Account name Length and Account Name:
-		//                int acclen = reader.ReadByte();
-		//                Data.Add(RealmData.RD_ACCOUNT_NAME, System.Text.Encoding.UTF8.GetString((reader.ReadBytes(acclen))));
-		//                break;
-
-		//        }
-		//    }
-		//}
 	}
 	class RealmServer
 	{
@@ -202,6 +171,22 @@ namespace WoW_Machinima_Studio.Network
 		private TcpClient _client;
 		private String _password;
 		private bool _is_running;
+		private static byte[] N = { 0x89, 0x4B, 0x64, 0x5E, 0x89, 0xE1, 0x53, 0x5B, 
+									0xBD, 0xAD, 0x5B, 0x8B, 0x29, 0x06, 0x50, 0x53, 
+									0x08, 0x01, 0xB1, 0x8E, 0xBF, 0xBF, 0x5E, 0x8F, 
+									0xAB, 0x3C, 0x82, 0x87, 0x2A, 0x3E, 0x9B, 0xB7 };
+		private static byte[] rN = reverse(N);
+		private byte[] bA;
+		private byte[] bB;
+		private byte[] bS;
+		private byte[] bV;
+		private byte[] bR;
+		private static byte[] reverse(byte[] data)
+		{
+			byte[] b = (byte[])(data.Clone());
+			Array.Reverse(b);
+			return b;
+		}
 		public RealmServer(string password)
 		{
 			_password = password;
@@ -237,17 +222,115 @@ namespace WoW_Machinima_Studio.Network
 		private void _read_packets_loop()
 		{
 			_is_running = true;
+			_client.Client.Blocking = true;
+			_client.Client.ReceiveTimeout = -1;
 			while (_is_running)
 			{
-				RealmPacket packet = RealmPacket.FromStream(_client);
+				Thread.Sleep(10);
+				if ((_client == null) || !_client.Connected)
+					_is_running = false;
+				byte[] buffer = new byte[4];
+				try
+				{
+					_client.Client.Receive(buffer);
+					int size = (int)BitConverter.ToUInt16(buffer, 2);
+					if (size == 0)
+						continue;
+					Array.Resize<byte>(ref buffer, buffer.Length + size);
+					_client.Client.Receive(buffer,4,size,SocketFlags.None);
+				}
+				catch // Disconnected
+				{
+					break;
+				}
+				RealmPacket packet = RealmPacket.FromByteArray(buffer);
+				
 				switch (packet.opcode)
 				{
+					#region AUTH Packet
 					case RealmOpcode.RS_AUTH_RECON_CHALLENGE:
 					case RealmOpcode.RS_AUTH_LOGON_CHALLENGE:
-						RealmPacket p = RealmPacket.CreateAuthResponse((string)packet.Data[RealmData.RD_ACCOUNT_NAME], _password);
-						byte[] b = p.ToByteArray();
-						_client.GetStream().Write(b,0,b.Length);
-						break;
+						{
+							RealmPacket response = new RealmPacket();
+							byte[] bytestosend;
+							SHA1 sha = new SHA1CryptoServiceProvider();
+							byte[] user_pass = System.Text.Encoding.UTF8.GetBytes((("WoWMS:" + _password).ToCharArray()));
+							byte[] hash = sha.ComputeHash(user_pass);
+							byte[] salt = new byte[32];
+							new Random().NextBytes(salt);
+							byte[] result = new byte[hash.Length + salt.Length];
+							hash.CopyTo(result, 0);
+							salt.CopyTo(result, hash.Length);
+							byte[] finalhash = sha.ComputeHash(result);
+
+							byte[] rand = new byte[20];
+							new Random().NextBytes(rand);
+							bR = (byte[])rand.Clone();
+							//BigInteger int_a = new BigInteger(reverse(finalhash));
+							//BigInteger int_b = new BigInteger(reverse(N));
+							BigInteger int_c = new BigInteger(new Byte[] { 7 });
+							BigInteger int_d = int_c.modPow(new BigInteger(reverse(finalhash)), new BigInteger(reverse(N)));
+
+							BigInteger K = new BigInteger(new Byte[] { 3 });
+							BigInteger temp = ((K * int_d) + int_c.modPow(new BigInteger(reverse(rand)), new BigInteger(reverse(N)))) % new BigInteger(reverse(N));
+
+							this.bB = temp.getBytes();
+
+							response = new RealmPacket();
+							response.opcode = RealmOpcode.RS_AUTH_LOGON_CHALLENGE;
+							response.Data.Add(RealmData.RD_AUTH_ERROR, 0);
+							response.Data.Add(RealmData.RD_AUTH_HASH, temp.getBytes());
+							response.Data.Add(RealmData.RD_AUTH_SALT, salt);
+							response.Data.Add(RealmData.RD_AUTH_N, N);
+							//RealmPacket p = RealmPacket.CreateAuthResponse((string)packet.Data[RealmData.RD_ACCOUNT_NAME], _password);
+							bytestosend = response.ToByteArray();
+							_client.Client.Send(bytestosend);
+							break;
+						}
+					#endregion
+					#region PROOF Packet
+					case RealmOpcode.RS_AUTH_RECON_PROOF:
+					case RealmOpcode.RS_AUTH_LOGON_PROOF:
+						{
+							RealmPacket response = new RealmPacket();
+							byte[] bytestosend;
+							SHA1 sha = new SHA1CryptoServiceProvider();
+							response = new RealmPacket();
+							response.opcode = RealmOpcode.RS_AUTH_LOGON_PROOF;
+							byte[] b = new byte[32 + bB.Length + 1 + 16 + 16];
+							BinaryWriter writer = new BinaryWriter(new MemoryStream(b));
+							//((byte[])packet.Data[RealmData.RD_SRP6_M1]).CopyTo(b, 0);
+							writer.Write((byte[])packet.Data[RealmData.RD_SRP6_M1]);
+							//bB.CopyTo(b, 32);
+							writer.Write(bB);
+							BigInteger u = new BigInteger(sha.ComputeHash(b));
+							BigInteger s = ((BigInteger)(new BigInteger((byte[])(packet.Data[RealmData.RD_SRP6_M1]))
+								* (new BigInteger(bV).modPow(u, new BigInteger(N))))).modPow(new BigInteger(bR), new BigInteger(N));
+							byte[] t = s.getBytes();
+							byte[] t1 = new byte[16];
+
+							for (int i = 0; i < 16; i++)
+								t1[i] = t[i * 2];
+							writer.Write(t1);
+
+							byte[] hash = sha.ComputeHash(b);
+							byte[] vK = new byte[40];
+							for (int i = 0; i < 20; i++)
+							{
+								vK[2 * i] = sha.ComputeHash(b)[i];
+							}
+							for (int i = 0; i < 16; i++)
+								t1[i] = t[i * 2 + 1];
+							writer.Write(t1);
+							for (int i = 0; i < 20; i++)
+							{
+								vK[2 * i + 1] = sha.ComputeHash(b)[i];
+							}
+							bytestosend = response.ToByteArray();
+							_client.Client.Send(bytestosend);
+							break;
+						}
+					#endregion
 					default:
 						break;
 				}
