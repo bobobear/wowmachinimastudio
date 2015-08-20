@@ -1,0 +1,1 @@
+The goal of this project is to enable Machinima Creators to create more customized machinimas. It consists of a Server emulator and a GUI Addon.
